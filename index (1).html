@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Для Шахри ♡</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital@1&family=Roboto:wght@400;500&display=swap">
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;overflow:hidden;background:#070711;color:#f8e4ee;font:400 16px/1.5 Roboto,sans-serif}
+canvas{position:fixed;top:0;left:0;display:block;background:radial-gradient(70% 50% at 50% 35%,#2a1838,#070711 70%)}
+h1,h2{font:italic 400 clamp(28px,7.5vw,42px)/1.25 "Playfair Display",serif;color:#f6c6d9}
+.btn{padding:14px 28px;border:0;border-radius:40px;font:500 16px Roboto,sans-serif;color:#2a0f1e;cursor:pointer;background:linear-gradient(135deg,#f0a6c3,#c8719a);box-shadow:0 8px 26px #c8719a66}
+.btn:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:3px}
+#intro{position:fixed;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;text-align:center;background:#070711ee;transition:opacity 1.2s}
+#intro.off{opacity:0;pointer-events:none}
+#intro p{color:#c79bb0;max-width:300px}
+.panel{position:fixed;left:0;right:0;bottom:0;z-index:2;max-width:520px;margin:0 auto;padding:22px 20px calc(22px + env(safe-area-inset-bottom));text-align:center;background:linear-gradient(#0a0a14cc,#0a0a14f5);backdrop-filter:blur(10px);border:1px solid #ffffff1a;border-bottom:0;border-radius:24px 24px 0 0}
+.panel[hidden]{display:none}
+.panel.in{animation:in .7s}
+@keyframes in{from{opacity:0;transform:translateY(14px)}}
+.panel.bad{animation:shake .4s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+#step{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#b9769a;margin-bottom:6px}
+#q{font-size:clamp(21px,5.5vw,26px);margin-bottom:16px}
+.row{display:flex;gap:10px}
+input{flex:1;min-width:0;padding:13px 16px;border-radius:40px;border:1px solid #ffffff30;background:#ffffff10;color:#fff;font:400 16px Roboto,sans-serif}
+#fb{min-height:1.6em;margin-top:12px;font-size:15px;color:#f6c6d9}
+#fb.good{color:#ffe3a3}
+#end p{color:#ecc9d9;margin:10px 0 18px;font-size:18px}
+#end h2{color:#ffe3a3;text-shadow:0 0 24px #ffd27a77}
+#thx{margin-top:12px;color:#ffe3a3;min-height:1.5em}
+#warn{position:fixed;top:0;left:0;right:0;z-index:9;padding:8px;text-align:center;background:#b3203a;color:#fff;font-size:13px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="warn" hidden>Заполни ответы в массиве QUEST (в начале скрипта), пока не отправлял ей ссылку.</div>
+<section id="intro">
+  <h1>Шахри,<br>тебя ждёт квест ✦</h1>
+  <p>Ответь на несколько вопросов, и небо откроет тебе секрет.</p>
+  <button class="btn" id="go">Начать</button>
+</section>
+<section class="panel" id="panel" hidden>
+  <p id="step"></p>
+  <h2 id="q"></h2>
+  <div class="row"><input id="a" autocomplete="off" enterkeyhint="done" placeholder="Твой ответ"><button class="btn" id="ok">Ответить</button></div>
+  <p id="fb"></p>
+</section>
+<section class="panel" id="end" hidden>
+  <h2>Шахри, любимая ♡</h2>
+  <p>Я тебя очень сильно люблю и очень сильно уважаю. Хочу, чтобы ты всегда была рядом со мной.</p>
+  <button class="btn" id="yes">Я всегда буду рядом ♡</button>
+  <p id="thx"></p>
+</section>
+<script>
+// ===== ЗАПОЛНИ ОТВЕТЫ =====
+// ans: список подходящих ответов (регистр, пробелы и точки не важны; ответ засчитается, если содержит любой из них).
+// hint: подсказка, появится после двух неверных попыток.
+const QUEST=[
+ {q:"Когда начались наши отношения?",ans:["9.10.2026","9.10.26","2026.10.09","9 окт"],hint:"Подсказка: это был день осенью, в октябре ♡"},
+ {q:"Как я тебя нежно называю?",ans:["любим"],hint:"Подсказка: так называют самого дорогого человека ♡"},
+ {q:"Как меня зовут?",ans:["русл"],hint:"Подсказка: имя начинается на букву «Р» ♡"},
+ {q:"Какой у меня характер?",ans:["стесн","эмоц","весел"],hint:"Подсказка: подумай, как я веду себя, когда волнуюсь и когда шучу ♡"}
+];
+// ==========================
+const Q=QUEST.length,N=12;
+const $=s=>document.querySelector(s),c=$('#c'),x=c.getContext('2d');
+const norm=s=>s.toLowerCase().replace(/ё/g,'е').replace(/[^a-zа-я0-9]/g,'');
+let W,H,bg=[],pts=[],tf=[],lit=0,fin=0,done=false,started=false,busy=false,tries=0,shoot=[],hearts=[],qi=0;
+try{qi=Math.min(+localStorage.getItem('quest-qi')||0,Q)}catch(e){}
+if(QUEST.some(q=>q.ans.some(a=>/ЗАМЕНИ/.test(a))))$('#warn').hidden=false;
+
+function size(){
+  const D=devicePixelRatio||1;W=innerWidth;H=innerHeight;
+  c.width=W*D;c.height=H*D;c.style.width=W+'px';c.style.height=H+'px';x.setTransform(D,0,0,D,0,0);
+  bg=Array.from({length:Math.round(W*H/5000)},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.3+.3,p:Math.random()*6.3,s:.5+Math.random()*1.5}));
+  const s=Math.min(W,H*.5)/40,cx=W/2,cy=H*.3-2.5*s;
+  pts=Array.from({length:N},(_,k)=>{
+    const t=Math.PI+k*2*Math.PI/N;
+    return{x:cx+16*Math.sin(t)**3*s,y:cy-(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))*s};
+  });
+}
+size();
+addEventListener('resize',()=>{if(innerWidth!==W)size()});
+
+function seg(a,b,t0,t){
+  const p=Math.min(1,(t-t0)/600);if(p<=0)return;
+  x.beginPath();x.moveTo(a.x,a.y);x.lineTo(a.x+(b.x-a.x)*p,a.y+(b.y-a.y)*p);x.stroke();
+}
+function star(p,r,col,glow){
+  x.shadowColor=col;x.shadowBlur=glow;x.fillStyle=col;
+  x.beginPath();x.arc(p.x,p.y,r,0,7);x.fill();x.shadowBlur=0;
+}
+function frame(t){
+  x.clearRect(0,0,W,H);
+  for(const b of bg){x.globalAlpha=.3+.5*Math.sin(t/1000*b.s+b.p)**2;x.fillStyle='#fff';x.beginPath();x.arc(b.x,b.y,b.r,0,7);x.fill();}
+  x.globalAlpha=1;
+  if(started){
+    if(fin&&t-fin>600){
+      x.globalAlpha=Math.min(.14,(t-fin-600)/20000);x.fillStyle='#f0a6c3';
+      x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y));x.fill();x.globalAlpha=1;
+    }
+    x.strokeStyle='#f0a6c3';x.lineWidth=1.8;x.lineCap='round';x.shadowColor='#f0a6c3';x.shadowBlur=10;
+    for(let i=1;i<lit;i++)seg(pts[i-1],pts[i],tf[i],t);
+    if(fin)seg(pts[N-1],pts[0],fin,t);
+    x.shadowBlur=0;
+    pts.forEach((p,k)=>{
+      if(k<lit&&t>=tf[k])star(p,4.5+(fin?1.5*Math.sin(t/500+k):0),'#ffe3a3',16);
+      else star(p,2,'#ffffff55',0);
+    });
+    if(fin){
+      if(Math.random()<.012)shoot.push({x:Math.random()*W,y:Math.random()*H*.4,vx:7+Math.random()*4,vy:3+Math.random()*2,l:1});
+      for(const s of shoot){
+        x.strokeStyle='rgba(255,230,240,'+s.l+')';x.lineWidth=1.5;
+        x.beginPath();x.moveTo(s.x,s.y);x.lineTo(s.x-s.vx*7,s.y-s.vy*7);x.stroke();
+        s.x+=s.vx;s.y+=s.vy;s.l-=.016;
+      }
+      shoot=shoot.filter(s=>s.l>0);
+    }
+  }
+  for(const h of hearts){
+    x.globalAlpha=Math.max(0,h.l);x.fillStyle='#f0a6c3';x.font=h.s+'px serif';x.fillText('♥',h.x,h.y);
+    h.x+=h.vx;h.y+=h.vy;h.vy+=.12;h.l-=.007;
+  }
+  hearts=hearts.filter(h=>h.l>0);x.globalAlpha=1;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function light(target){
+  const now=performance.now();
+  for(let k=lit;k<target;k++)tf[k]=now+300+(k-lit)*380;
+  lit=target;
+}
+function showQ(){
+  const p=$('#panel');
+  $('#step').textContent='Вопрос '+(qi+1)+' из '+Q;
+  $('#q').textContent=QUEST[qi].q;$('#a').value='';$('#fb').textContent='';$('#fb').className='';tries=0;busy=false;
+  p.hidden=false;p.classList.remove('in');void p.offsetWidth;p.classList.add('in');
+}
+function finish(){
+  $('#panel').hidden=true;
+  setTimeout(()=>{fin=performance.now();},1300);
+  setTimeout(()=>{const e=$('#end');e.hidden=false;e.classList.add('in');},4200);
+}
+function check(){
+  if(busy)return;
+  const v=norm($('#a').value);if(!v)return;
+  const fb=$('#fb'),p=$('#panel');
+  if(QUEST[qi].ans.some(a=>v.includes(norm(a)))){
+    busy=true;fb.textContent='Верно! ✦';fb.className='good';
+    qi++;try{localStorage.setItem('quest-qi',qi)}catch(e){}
+    light(Math.round(N*qi/Q));
+    setTimeout(()=>qi<Q?showQ():finish(),1400);
+  }else{
+    tries++;fb.className='';
+    fb.textContent=tries>=2&&QUEST[qi].hint?QUEST[qi].hint:'Не угадала, попробуй ещё раз ♡';
+    p.classList.remove('bad');void p.offsetWidth;p.classList.add('bad');
+  }
+}
+$('#ok').onclick=check;
+$('#a').addEventListener('keydown',e=>{if(e.key==='Enter')check()});
+$('#go').onclick=()=>{
+  started=true;$('#intro').classList.add('off');
+  lit=Math.round(N*qi/Q);for(let k=0;k<lit;k++)tf[k]=0;
+  qi<Q?showQ():(lit=N,finish());
+};
+$('#yes').onclick=()=>{
+  for(let i=0;i<70;i++)hearts.push({x:W/2,y:H*.85,vx:(Math.random()-.5)*9,vy:-Math.random()*10-3,s:14+Math.random()*22,l:1});
+  $('#thx').textContent='Я люблю тебя ♡';
+};
+</script>
+</body>
+</html>
